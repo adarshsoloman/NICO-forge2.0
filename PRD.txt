@@ -1,0 +1,213 @@
+PRD: Bilingual PDF-to-CSV Dataset Extraction Pipeline
+1. Product Overview
+
+This product processes bilingual documents (English + Hindi) that contain the same content, typically in page-aligned PDF format (e.g., NCERT books).
+The system extracts text from both PDFs, splits content into small chunks, aligns the English and Hindi text, verifies correctness using an LLM, applies user-defined regex extraction rules, and outputs a structured CSV dataset.
+The pipeline is parallelized for speed and designed for high accuracy with minimal hallucination.
+
+2. Goals & Objectives
+
+Extract clean, aligned bilingual datasets from English/Hindi PDFs.
+
+Preserve page-level structure, ensuring deterministic alignment.
+
+Produce high-quality English→Hindi translation pairs (verified, not hallucinated).
+
+Apply regex-based extraction rules to capture specific entities/fields.
+
+Output a consistent, machine-readable CSV suitable for dataset creation, training, and analysis.
+
+Run in parallel for faster processing on large documents.
+
+3. Scope
+In Scope
+
+Input: Two PDFs containing the same content in English and Hindi.
+
+Extraction: Page-by-page text extraction using PyMuPDF.
+
+Processing:
+
+Sentence splitting
+
+Chunking (1–3 sentences)
+
+Index-based alignment
+
+Optional LLM verification/cleanup
+
+Regex extraction
+
+Output: Append-structured CSV with metadata.
+
+Parallel execution using thread pools.
+
+Out of Scope
+
+Reordering or auto-aligning mismatched PDFs using embeddings.
+
+OCR for scanned or image-only PDFs (optional future expansion).
+
+Full translation generation from scratch (LLM is verifier, not translator).
+
+Complex UI or dashboard.
+
+4. Assumptions
+
+Both PDFs are page-aligned (English page X corresponds to Hindi page X).
+
+Text is digital, not a scanned image (OCR is not required).
+
+Sentence boundaries can be reasonably identified via punctuation.
+
+Chunking of 1–3 sentences provides sufficient semantic context.
+
+LLM is used only to verify or refine the Hindi chunk, not to generate full translations.
+
+5. Functional Requirements
+5.1 PDF Extraction
+
+System shall extract text from each page of both PDFs using PyMuPDF.
+
+System shall normalize whitespace and remove excessive line breaks.
+
+5.2 Sentence Splitting
+
+English and Hindi text shall be split using punctuation (., ?, !, ।).
+
+Empty or whitespace-only entries shall be removed.
+
+5.3 Chunking
+
+Sentences shall be grouped into chunks of 1–3 sentences.
+
+Chunk size shall be configurable.
+
+5.4 Index-Based Alignment
+
+For page i, English chunk j shall align with Hindi chunk j.
+
+If either side has fewer chunks, the system shall insert an empty string ("") for alignment.
+
+Alignment method shall be recorded as "index" in the CSV.
+
+5.5 LLM Verification Layer
+
+System shall expose a llm_map(eng_chunk, hin_chunk_raw) function as a pluggable hook.
+
+Default behavior: return Hindi chunk unchanged (no-op).
+
+When configured, LLM shall:
+
+Use English chunk + Hindi chunk as context
+
+Return the verified or corrected Hindi translation
+
+Output 1–3 sentences
+
+Optionally include flags such as [UNCERTAIN]
+
+5.6 Regex Extraction
+
+System shall run user-configurable regex patterns on:
+
+either hin_chunk_verified
+
+or hin_chunk_raw
+
+Matches shall be saved as JSON array strings.
+
+5.7 CSV Output
+
+The system shall generate rows with the following columns:
+
+Column	Description
+doc_id	name of PDF
+page	page number
+chunk_id	chunk index
+eng_chunk	English text chunk
+hin_chunk_raw	Extracted Hindi chunk
+hin_chunk_verified	LLM-verified Hindi
+alignment_method	"index"
+regex_matches	JSON list of matches
+llm_flags	Optional flags (e.g., [UNCERTAIN])
+timestamp	UTC ISO timestamp
+
+System shall append rows to final_output.csv.
+
+Header shall be written only on first creation.
+
+5.8 Parallel Execution
+
+System shall support configurable number of worker threads.
+
+Each page shall be processed independently in a worker thread.
+
+System shall safely append to CSV without corruption.
+
+6. Non-Functional Requirements
+6.1 Performance
+
+Pipeline should support documents of 300–1000 pages.
+
+Parallelization should reduce total processing time.
+
+6.2 Reliability
+
+Failures in one page shall not halt the entire pipeline.
+
+Failed pages shall log errors.
+
+6.3 Extensibility
+
+LLM provider should be replaceable (OpenRouter, OpenAI, etc.).
+
+Regex patterns should be configurable.
+
+OCR module may be added later.
+
+6.4 Maintainability
+
+Code shall be modular:
+
+extraction
+
+splitting
+
+chunking
+
+alignment
+
+LLM mapping
+
+regex step
+
+CSV writer
+
+7. Risks
+Risk	Mitigation
+Page mismatch between English and Hindi PDFs	Manual pre-check; remove extra pages
+Poor Hindi sentence boundaries	Keep chunk sizes small; LLM can compensate
+LLM rate limits	Option to disable or batch LLM calls
+Regex overfitting or underfitting	Iterative tuning on sample rows
+8. Success Criteria
+
+Dataset rows align properly across all tested pages.
+
+LLM-verified Hindi matches English semantic meaning.
+
+Regex fields extract expected structured data.
+
+CSV is readable, consistent, and stable on large documents.
+
+Pipeline completes without crashing.
+
+9. Deliverables
+
+rewat_pipeline.py final script
+
+final_output.csv
+
+PRD.txt
+
+README.md explaining usage, dependencies, configuration
