@@ -212,9 +212,13 @@ def process_phase2_optimized(
         })
         pbar.update(1)
         
-        # Write chunks to output
+        # Write chunks to output (filter out invalid chunks)
         if result.success:
             for chunk in result.data:
+                # Skip chunks with empty English or Hindi
+                if not chunk.get('english', '').strip() or not chunk.get('hindi', '').strip():
+                    continue
+                    
                 output_entry = {
                     'english': chunk['english'],
                     'hindi': chunk['hindi']

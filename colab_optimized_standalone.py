@@ -19,7 +19,7 @@ Expected speed: 5,000 rows in 30-45 minutes (vs 9+ hours)
 
 LLM_API_KEY = "your-openrouter-api-key-here"  # Get from https://openrouter.ai/
 LLM_BASE_URL = "https://openrouter.ai/api/v1"
-LLM_MODEL = "meta-llama/llama-3.1-8b-instruct:free"  # Free tier model
+LLM_MODEL = "gpt-4o-mini"  # Works with OpenRouter
 
 INPUT_FILE = "pib_mismatched_for_llm.jsonl"  # Your uploaded file
 OUTPUT_FILE = "pib_chunked_llm_aligned.jsonl"  # Output file
@@ -327,8 +327,13 @@ def process_optimized(resume=True):
         })
         pbar.update(1)
         
+        # Write chunks to output (filter out invalid chunks)
         if result.success:
             for chunk in result.data:
+                # Skip chunks with empty English or Hindi
+                if not chunk.get('english', '').strip() or not chunk.get('hindi', '').strip():
+                    continue
+                
                 outfile.write(json.dumps({
                     'english': chunk['english'],
                     'hindi': chunk['hindi']
